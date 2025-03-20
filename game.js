@@ -24,6 +24,16 @@ const BALL_COLORS = [
     '#800000'  // 15 - Maroon striped
 ];
 
+// Add power meter constants
+const POWER_METER = {
+    MIN_POWER: 2,
+    MAX_POWER: 15,
+    DEFAULT_POWER: 5,
+    WIDTH: 20,
+    HEIGHT: 150,
+    COLORS: ['#00FF00', '#FFFF00', '#FFA500', '#FF0000']
+};
+
 const GAME_STATES = {
   START: 'start',
   PLAYING: 'playing',
@@ -78,6 +88,12 @@ const PLAYER_COLORS = {
   PLAYER2: '#FF4500'  // Orange Red
 };
 
+// Add difficulty mode constants
+const DIFFICULTY_MODES = {
+  EASY: 'easy',
+  HARD: 'hard'
+};
+
 // Canvas setup
 const canvas = document.getElementById('poolCanvas');
 const ctx = canvas.getContext('2d');
@@ -92,7 +108,7 @@ let cue = {
     y: 0,
     visible: false,
     angle: 0,
-    power: 5  // Fixed power value
+    power: POWER_METER.DEFAULT_POWER  // Updated to use default power
 };
 let gameState = GAME_STATES.START; // start, playing, game_over
 let playState = 'aiming'; // aiming, shooting, waiting
@@ -108,20 +124,26 @@ let playerMode = PLAYER_MODES.ONE_PLAYER;
 let currentPlayer = 1; // 1 or 2
 let player1Score = 0;
 let player2Score = 0;
+let powerMeterActive = false;
+let currentPower = POWER_METER.DEFAULT_POWER;
+let powerIncreasing = true;
 let cueSticks = [
   {
     visible: false,
     angle: 0,
-    power: 5,
+    power: POWER_METER.DEFAULT_POWER,  // Updated to use default power
     color: PLAYER_COLORS.PLAYER1
   },
   {
     visible: false,
     angle: Math.PI,
-    power: 5,
+    power: POWER_METER.DEFAULT_POWER,  // Updated to use default power
     color: PLAYER_COLORS.PLAYER2
   }
 ];
+
+// Update game state variables
+let difficultyMode = DIFFICULTY_MODES.EASY; // Default to easy mode
 
 // Initialize the game
 function init() {
@@ -301,6 +323,11 @@ function update() {
             unlockAchievement('three_in_one');
         }
         
+        // Check for early 8-ball scratch after updating ball positions
+        if (checkEarlyEightBallScratch()) {
+            return; // Exit early if game is over
+        }
+        
         // If cue ball fell in pocket, game over
         if (cueBallInPocket) {
             gameState = GAME_STATES.GAME_OVER;
@@ -343,6 +370,26 @@ function update() {
                 }
             }
         }
+    }
+
+    // Update power meter animation if active
+    if (powerMeterActive) {
+        if (powerIncreasing) {
+            currentPower += 0.2;
+            if (currentPower >= POWER_METER.MAX_POWER) {
+                currentPower = POWER_METER.MAX_POWER;
+                powerIncreasing = false;
+            }
+        } else {
+            currentPower -= 0.2;
+            if (currentPower <= POWER_METER.MIN_POWER) {
+                currentPower = POWER_METER.MIN_POWER;
+                powerIncreasing = true;
+            }
+        }
+        
+        // Update current player's cue stick power
+        cueSticks[currentPlayer - 1].power = currentPower;
     }
 }
 
@@ -423,12 +470,12 @@ function drawStartPanel() {
     ctx.fillStyle = '#FFFFFF';
     ctx.font = 'bold 24px Arial';
     ctx.textAlign = 'center';
-    ctx.fillText('Select Mode', width / 2, height * 2/5);
+    ctx.fillText('Select Mode', width / 2, height * 2/5 - 10);
     
-    // Draw mode buttons
+    // Draw player mode buttons
     const buttonWidth = 150;
     const buttonHeight = 40;
-    const modeSpacing = 20;  // Renamed from 'spacing' to 'modeSpacing'
+    const modeSpacing = 30;
     
     // One Player button
     const onePlayerX = width / 2 - buttonWidth - modeSpacing / 2;
@@ -444,7 +491,7 @@ function drawStartPanel() {
     ctx.fillText('One Player', onePlayerX + buttonWidth / 2, modeButtonY + buttonHeight / 2);
     
     // Two Player button
-    const twoPlayerX = width / 2 + modeSpacing / 2;  // Use modeSpacing here
+    const twoPlayerX = width / 2 + modeSpacing / 2;
     
     ctx.fillStyle = playerMode === PLAYER_MODES.TWO_PLAYER ? '#4CAF50' : '#555555';
     ctx.fillRect(twoPlayerX, modeButtonY, buttonWidth, buttonHeight);
@@ -455,11 +502,42 @@ function drawStartPanel() {
     ctx.textBaseline = 'middle';
     ctx.fillText('Two Players', twoPlayerX + buttonWidth / 2, modeButtonY + buttonHeight / 2);
     
-    // Draw play button
+    // Draw difficulty selection
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 24px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('Select Difficulty', width / 2, height * 2/5 + 100);
+    
+    // Easy mode button
+    const easyX = width / 2 - buttonWidth - modeSpacing / 2;
+    const difficultyButtonY = height * 2/5 + 140;
+    
+    ctx.fillStyle = difficultyMode === DIFFICULTY_MODES.EASY ? '#4CAF50' : '#555555';
+    ctx.fillRect(easyX, difficultyButtonY, buttonWidth, buttonHeight);
+    
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 16px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('Easy Mode', easyX + buttonWidth / 2, difficultyButtonY + buttonHeight / 2);
+    
+    // Hard mode button
+    const hardX = width / 2 + modeSpacing / 2;
+    
+    ctx.fillStyle = difficultyMode === DIFFICULTY_MODES.HARD ? '#4CAF50' : '#555555';
+    ctx.fillRect(hardX, difficultyButtonY, buttonWidth, buttonHeight);
+    
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 16px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('Hard Mode', hardX + buttonWidth / 2, difficultyButtonY + buttonHeight / 2);
+    
+    // Draw play button (adjust position to accommodate the new difficulty buttons)
     const playButtonWidth = 200;
     const playButtonHeight = 60;
     const playButtonX = width / 2 - playButtonWidth / 2;
-    const playButtonY = height * 2 / 3 - playButtonHeight / 2;
+    const playButtonY = height * 2/3 + 40;
     
     ctx.fillStyle = '#4CAF50';
     ctx.fillRect(playButtonX, playButtonY, playButtonWidth, playButtonHeight);
@@ -468,11 +546,16 @@ function drawStartPanel() {
     ctx.font = 'bold 24px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('Play Game', width / 2, height * 2 / 3);
+    ctx.fillText('Play Game', width / 2, playButtonY + playButtonHeight / 2);
     
     // Draw instructions
     ctx.font = '16px Arial';
-    ctx.fillText('Click and aim with mouse, release to shoot', width / 2, height * 2 / 3 + 60);
+    ctx.fillText('Click and aim with mouse, release to shoot', width / 2, playButtonY + playButtonHeight + 30);
+    ctx.fillText('Power meter will appear when shooting - release to set power', width / 2, playButtonY + playButtonHeight + 55);
+    
+    // Add explanation of easy vs hard mode
+    ctx.fillStyle = '#FFFF99'; // Light yellow for emphasis
+    ctx.fillText('Easy Mode: Shows trajectory line | Hard Mode: No visual aids', width / 2, playButtonY + playButtonHeight + 80);
     
     // Draw achievements section
     ctx.fillStyle = '#FFFFFF';
@@ -665,6 +748,11 @@ function drawGameElements() {
         ctx.fillText(currentAchievement.title, popupX + 60, popupY + 45);
         ctx.fillText(currentAchievement.description, popupX + 60, popupY + 65);
     }
+
+    // Draw power meter if active
+    if (powerMeterActive && playState === 'shooting') {
+        drawPowerMeter();
+    }
 }
 
 // Add function to draw game over panel
@@ -712,9 +800,17 @@ function resetGame() {
     player1Score = 0;
     player2Score = 0;
     
+    // Reset power meter
+    powerMeterActive = false;
+    currentPower = POWER_METER.DEFAULT_POWER;
+    
     // Reset cue sticks
     cueSticks[0].visible = true;
+    cueSticks[0].power = POWER_METER.DEFAULT_POWER;
     cueSticks[1].visible = false;
+    cueSticks[1].power = POWER_METER.DEFAULT_POWER;
+    
+    // Don't reset difficulty mode - keep the user's selection
 }
 
 // Mouse event handlers
@@ -727,7 +823,7 @@ function handleMouseDown(e) {
         // Check if mode buttons are clicked
         const buttonWidth = 150;
         const buttonHeight = 40;
-        const modeSpacing = 20;
+        const modeSpacing = 30;
         const onePlayerX = width / 2 - buttonWidth - modeSpacing / 2;
         const twoPlayerX = width / 2 + modeSpacing / 2;
         const modeButtonY = height * 2/5 + 30;
@@ -744,14 +840,26 @@ function handleMouseDown(e) {
             playerMode = PLAYER_MODES.TWO_PLAYER;
         }
         
-        // Check if play button is clicked
-        const playButtonWidth = 200;
-        const playButtonHeight = 60;
-        const playButtonX = width / 2 - playButtonWidth / 2;
-        const playButtonY = height * 2 / 3 - playButtonHeight / 2;
+        // Check if difficulty buttons are clicked
+        const difficultyButtonY = height * 2/5 + 140;
         
-        if (mouseX >= playButtonX && mouseX <= playButtonX + playButtonWidth &&
-            mouseY >= playButtonY && mouseY <= playButtonY + playButtonHeight) {
+        // Easy mode button
+        if (mouseX >= onePlayerX && mouseX <= onePlayerX + buttonWidth &&
+            mouseY >= difficultyButtonY && mouseY <= difficultyButtonY + buttonHeight) {
+            difficultyMode = DIFFICULTY_MODES.EASY;
+        }
+        
+        // Hard mode button
+        if (mouseX >= twoPlayerX && mouseX <= twoPlayerX + buttonWidth &&
+            mouseY >= difficultyButtonY && mouseY <= difficultyButtonY + buttonHeight) {
+            difficultyMode = DIFFICULTY_MODES.HARD;
+        }
+        
+        // Check if play button is clicked (adjust for new position)
+        const playButtonY = height * 2/3 + 40;
+        
+        if (mouseX >= onePlayerX && mouseX <= onePlayerX + buttonWidth &&
+            mouseY >= playButtonY && mouseY <= playButtonY + buttonHeight) {
             resetGame();
         }
     } else if (gameState === GAME_STATES.GAME_OVER) {
@@ -773,6 +881,9 @@ function handleMouseDown(e) {
             cue.visible = true;
             
             playState = 'shooting';
+            powerMeterActive = true;
+            currentPower = POWER_METER.DEFAULT_POWER;
+            powerIncreasing = true;
         }
     }
 }
@@ -808,7 +919,7 @@ function handleMouseUp(e) {
         if (cueBall) {
             const activeStick = cueSticks[currentPlayer - 1];
             
-            // Apply fixed force to cue ball
+            // Apply force to cue ball based on current power
             cueBall.vx = Math.cos(activeStick.angle + Math.PI) * activeStick.power;
             cueBall.vy = Math.sin(activeStick.angle + Math.PI) * activeStick.power;
             
@@ -816,6 +927,7 @@ function handleMouseUp(e) {
             unlockAchievement('first_shot');
             
             activeStick.visible = false;
+            powerMeterActive = false;
             playState = 'waiting';
         }
     }
@@ -909,6 +1021,11 @@ function drawCueStick(cueBall, cueStick, playerNum) {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(`P${playerNum}`, textX, textY);
+    
+    // Draw trajectory line in easy mode
+    if (difficultyMode === DIFFICULTY_MODES.EASY && (playState === 'aiming' || playState === 'shooting')) {
+        drawTrajectoryLine();
+    }
 }
 
 // Add a function to draw a cue stick on the side
@@ -959,6 +1076,118 @@ function switchPlayer() {
     // Update cue stick visibility
     cueSticks[0].visible = currentPlayer === 1;
     cueSticks[1].visible = currentPlayer === 2;
+}
+
+// Add function to draw power meter
+function drawPowerMeter() {
+    const cueBall = balls.find(ball => ball.number === 0 && ball.inPlay);
+    if (!cueBall) return;
+    
+    const meterX = 50;
+    const meterY = height - POWER_METER.HEIGHT - 50;
+    
+    // Draw meter background
+    ctx.fillStyle = '#333333';
+    ctx.fillRect(meterX, meterY, POWER_METER.WIDTH, POWER_METER.HEIGHT);
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(meterX, meterY, POWER_METER.WIDTH, POWER_METER.HEIGHT);
+    
+    // Calculate power percentage
+    const powerRange = POWER_METER.MAX_POWER - POWER_METER.MIN_POWER;
+    const powerPercentage = (currentPower - POWER_METER.MIN_POWER) / powerRange;
+    const filledHeight = POWER_METER.HEIGHT * powerPercentage;
+    
+    // Draw gradient power level
+    const gradient = ctx.createLinearGradient(
+        meterX, meterY + POWER_METER.HEIGHT,
+        meterX, meterY
+    );
+    gradient.addColorStop(0, POWER_METER.COLORS[0]);
+    gradient.addColorStop(0.4, POWER_METER.COLORS[1]);
+    gradient.addColorStop(0.7, POWER_METER.COLORS[2]);
+    gradient.addColorStop(1, POWER_METER.COLORS[3]);
+    
+    ctx.fillStyle = gradient;
+    ctx.fillRect(
+        meterX, 
+        meterY + POWER_METER.HEIGHT - filledHeight, 
+        POWER_METER.WIDTH, 
+        filledHeight
+    );
+    
+    // Draw power level text
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 14px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(
+        `${Math.round(currentPower)}`, 
+        meterX + POWER_METER.WIDTH / 2, 
+        meterY - 15
+    );
+    ctx.fillText(
+        'POWER', 
+        meterX + POWER_METER.WIDTH / 2, 
+        meterY - 35
+    );
+    
+    // Draw markers
+    for (let i = 0; i <= 4; i++) {
+        const markerY = meterY + POWER_METER.HEIGHT * (1 - i/4);
+        ctx.beginPath();
+        ctx.moveTo(meterX - 5, markerY);
+        ctx.lineTo(meterX, markerY);
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+    }
+}
+
+// Add function to draw trajectory line in easy mode
+function drawTrajectoryLine() {
+    const cueBall = balls.find(ball => ball.number === 0 && ball.inPlay);
+    if (!cueBall) return;
+    
+    const activeStick = cueSticks[currentPlayer - 1];
+    
+    // Calculate trajectory line
+    const lineLength = 300; // Maximum line length
+    const angle = activeStick.angle + Math.PI; // Reverse angle for trajectory
+    
+    // Start point is the cue ball position
+    const startX = cueBall.x;
+    const startY = cueBall.y;
+    
+    // End point is in the direction of the cue stick
+    const endX = startX + Math.cos(angle) * lineLength;
+    const endY = startY + Math.sin(angle) * lineLength;
+    
+    // Draw the trajectory line
+    ctx.beginPath();
+    ctx.moveTo(startX, startY);
+    ctx.lineTo(endX, endY);
+    ctx.strokeStyle = 'rgba(255, 0, 0, 0.7)'; // Semi-transparent red
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 5]); // Dashed line
+    ctx.stroke();
+    ctx.setLineDash([]); // Reset to solid line
+}
+
+// Add a function to check for early 8-ball scratch
+function checkEarlyEightBallScratch() {
+    // Check if the 8-ball (ball number 8) is not in play
+    const eightBall = balls.find(ball => ball.number === 8);
+    const otherBalls = balls.filter(ball => ball.number > 0 && ball.number !== 8 && ball.inPlay);
+    
+    // If 8-ball is pocketed but other balls remain, it's a scratch
+    if (eightBall && !eightBall.inPlay && otherBalls.length > 0) {
+        gameState = GAME_STATES.GAME_OVER;
+        gameOverReason = 'Scratch! You pocketed the 8-ball too early';
+        hasScratchedThisGame = true;
+        return true;
+    }
+    return false;
 }
 
 // Start the game
